@@ -1,0 +1,2 @@
+# User_customized_book_recommendation_platform_using_LLM_Model_FE
+User_customized_book_recommendation_platform_using_LLM_Model_BE에 대응하는 FE
