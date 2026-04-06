@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '../api/client';
+import { api } from '../api/client';
 
 // Mock data for demonstration
 const MOCK_BOOKS = [
@@ -19,12 +19,15 @@ export const useLibrary = () => {
 
 export const useAddReview = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (review: { bookId: string; content: string }) => {
-      // In a real app: await apiClient.post('/reviews', review);
-      // Simulate fast response
-      return new Promise((resolve) => setTimeout(resolve, 100));
+      // Call actual endpoint
+      const res = await api.reviews.postReview({
+        book_id: review.bookId,
+        content: review.content
+      });
+      return res.data;
     },
     onSuccess: () => {
       // Invalidate queries if needed, but for immediate feedback we might just show a toast
