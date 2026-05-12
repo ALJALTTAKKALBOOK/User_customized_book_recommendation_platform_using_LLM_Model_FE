@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, User, BookOpen, Sparkles } from 'lucide-react';
+import { Send, User, BookOpen, Sparkles, Plus } from 'lucide-react';
 import { motion } from 'motion/react';
-// import { api } from '../../api/client'; // 필요 시 주석 해제
 import { useToastStore } from '../../store/useToastStore';
+import { useBooks } from '../../hooks/useBooks';
 
-// 🚨 백엔드에서 넘겨주는 JSON 규격
+// --- 인터페이스 정의 ---
 interface Book {
   book_id: number;
   title: string;
@@ -23,6 +23,7 @@ interface Message {
 }
 
 export function RecommendationChat() {
+  // 상태 관리
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -32,9 +33,13 @@ export function RecommendationChat() {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isAddingId, setIsAddingId] = useState<number | null>(null); // 개별 버튼 로딩 상태
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { addToast } = useToastStore();
+  const { addBookToLibrary } = useBooks(); // 서재 담기 훅
 
+  // 스크롤 하단 이동
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -43,6 +48,23 @@ export function RecommendationChat() {
     scrollToBottom();
   }, [messages]);
 
+  // 서재 담기 처리 함수
+  const handleAddToLibrary = async (book: any) => {
+    setIsAddingId(book.book_id);
+    try {
+      // 💡 백엔드 service가 요구하는 category 필드 추가
+      await addBookToLibrary({
+        book_id: book.book_id,
+        category: book.genre || "IT"
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsAddingId(null);
+    }
+  };
+
+  // 메시지 전송 및 스트리밍 처리
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
@@ -52,11 +74,15 @@ export function RecommendationChat() {
     setIsLoading(true);
 
     const assistantMsgId = (Date.now() + 1).toString();
-    setMessages((prev) => [...prev, { id: assistantMsgId, role: 'assistant', content: '', isStreaming: true }]);
+    setMessages((prev) => [
+      ...prev,
+      { id: assistantMsgId, role: 'assistant', content: '', isStreaming: true }
+    ]);
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/recommendations/stream', {
+      // 백엔드 스트리밍 엔드포인트 호출
+      const res = await fetch('/api/recommendations/stream', { // 👈 끝에 / 추가
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -75,6 +101,7 @@ export function RecommendationChat() {
       const decoder = new TextDecoder();
       let buffer = '';
 
+      // 서버 이벤트 블록 처리 함수
       const processEventBlock = (block: string) => {
         const eventMatch = block.match(/^event:\s*(.+)$/m);
         const eventType = eventMatch ? eventMatch[1] : 'message';
@@ -97,6 +124,7 @@ export function RecommendationChat() {
             console.error('Failed to parse books event', err);
           }
         } else {
+          // 일반 텍스트 스트리밍
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === assistantMsgId
@@ -107,6 +135,7 @@ export function RecommendationChat() {
         }
       };
 
+      // 스트림 읽기 루프
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -122,11 +151,15 @@ export function RecommendationChat() {
 
       if (buffer.trim()) processEventBlock(buffer.trim());
 
-      setMessages((prev) => prev.map((msg) => (msg.id === assistantMsgId ? { ...msg, isStreaming: false } : msg)));
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === assistantMsgId ? { ...msg, isStreaming: false } : msg))
+      );
     } catch (error) {
       console.error(error);
       addToast('추천을 가져오는 중 오류가 발생했습니다.', 'error');
-      setMessages((prev) => prev.map((msg) => (msg.id === assistantMsgId ? { ...msg, isStreaming: false, content: '서버와 연결을 실패했습니다.' } : msg)));
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === assistantMsgId ? { ...msg, isStreaming: false, content: '서버와 연결을 실패했습니다.' } : msg))
+      );
     } finally {
       setIsLoading(false);
     }
@@ -134,13 +167,15 @@ export function RecommendationChat() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] max-w-4xl mx-auto glass-panel rounded-[2rem] overflow-hidden relative">
+      {/* 배경 장식 */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none"></div>
 
+      {/* 메시지 영역 */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-8 relative z-10 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
         {messages.map((msg) => (
           <div key={msg.id} className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
 
-            {/* 프로필 아이콘 */}
+            {/* 아이콘 */}
             <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-lg ${msg.role === 'user'
               ? 'bg-gradient-to-br from-indigo-500 to-violet-600 text-white'
               : 'bg-white/10 border border-white/20 text-indigo-300 backdrop-blur-md'
@@ -150,7 +185,7 @@ export function RecommendationChat() {
 
             <div className={`max-w-[85%] ${msg.role === 'user' ? 'items-end' : 'items-start'} flex flex-col gap-3 w-full`}>
 
-              {/* 🌟 1. 책 카드 */}
+              {/*  추천 책 리스트 렌더링 */}
               {msg.books && msg.books.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full mb-2">
                   {msg.books.map((book, idx) => (
@@ -161,7 +196,7 @@ export function RecommendationChat() {
                       key={book.book_id || idx}
                       className="glass-panel p-4 rounded-2xl flex flex-col group hover:bg-white/10 transition-colors border border-white/10 overflow-hidden"
                     >
-                      {/* 🖼️ 책 표지 이미지 추가된 부분 */}
+                      {/* 책 표지 */}
                       <div className="mb-4 w-full h-40 rounded-xl overflow-hidden bg-black/20 flex items-center justify-center relative border border-white/5">
                         {book.cover_url ? (
                           <img
@@ -169,36 +204,49 @@ export function RecommendationChat() {
                             alt={book.title}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out"
                             onError={(e) => {
-                              // 이미지 로드 실패 시 기본 이미지로 대체
                               (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x400/2a2a35/a5a5b4?text=No+Cover';
                             }}
                           />
                         ) : (
                           <BookOpen size={32} className="text-white/20" />
                         )}
-
-                        {/* 난이도 뱃지 (이미지 우측 하단에 둥둥 띄우기) */}
                         <div className="absolute bottom-2 right-2 px-2.5 py-1 bg-black/60 backdrop-blur-md border border-white/20 text-white text-[10px] font-bold rounded-lg">
                           난이도 {book.difficulty}/10
                         </div>
                       </div>
 
-                      {/* 책 정보 제목/저자 */}
+                      {/* 제목/저자 */}
                       <div className="mb-3">
                         <h4 className="font-bold text-white text-[15px] line-clamp-2 leading-snug tracking-tight">{book.title}</h4>
                         <p className="text-xs text-white/50 mt-1.5 line-clamp-1">{book.author}</p>
                       </div>
 
                       {/* 줄거리 */}
-                      <div className="bg-black/20 border border-white/5 p-3 rounded-xl flex-1">
+                      <div className="bg-black/20 border border-white/5 p-3 rounded-xl flex-1 mb-4">
                         <p className="text-[13px] text-white/70 leading-relaxed line-clamp-4">{book.summary}</p>
                       </div>
+
+                      {/* 서재 담기 버튼 */}
+                      <button
+                        onClick={() => handleAddToLibrary(book)}
+                        disabled={isAddingId === book.book_id}
+                        className="w-full py-2.5 bg-indigo-500/20 hover:bg-indigo-500 text-indigo-300 hover:text-white border border-indigo-500/30 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 group/btn"
+                      >
+                        {isAddingId === book.book_id ? (
+                          <span className="animate-spin h-3 w-3 border-2 border-white/30 border-t-white rounded-full" />
+                        ) : (
+                          <>
+                            <Plus size={14} className="group-hover/btn:rotate-90 transition-transform" />
+                            서재에 담기
+                          </>
+                        )}
+                      </button>
                     </motion.div>
                   ))}
                 </div>
               )}
 
-              {/* 🌟 2. AI 답변 텍스트 */}
+              {/* AI 답변 텍스트 메시지 */}
               {(msg.content || msg.isStreaming || msg.role === 'user') && (
                 <div className={`px-5 py-4 rounded-2xl text-[15px] leading-relaxed backdrop-blur-md ${msg.role === 'user'
                   ? 'bg-white/10 border border-white/10 text-white rounded-tr-sm self-end'
@@ -215,7 +263,7 @@ export function RecommendationChat() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
+      {/* 입력창 영역 */}
       <div className="p-5 bg-black/40 border-t border-white/10 backdrop-blur-xl relative z-10">
         <div className="relative flex items-center max-w-4xl mx-auto">
           <input

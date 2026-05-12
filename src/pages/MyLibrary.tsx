@@ -2,53 +2,62 @@ import React, { useState } from 'react';
 import { useLibrary } from '../hooks/useBooks';
 import { ReviewWrite } from '../features/reviews/ReviewWrite';
 import { BookMarked, Edit3 } from 'lucide-react';
+import { motion } from 'motion/react';
 
 export function MyLibrary() {
   const { data: books, isLoading } = useLibrary();
-  const [selectedBook, setSelectedBook] = useState<{id: string, title: string} | null>(null);
+  const [selectedBook, setSelectedBook] = useState<any | null>(null);
 
-  if (isLoading) return <div className="p-8 text-center text-white/50">로딩 중...</div>;
+  if (isLoading) return <div className="p-20 text-center text-white/20 animate-pulse">데이터를 불러오는 중...</div>;
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <h1 className="text-3xl font-bold text-white mb-10 flex items-center gap-3 tracking-tight">
-        <div className="p-2.5 bg-white/10 rounded-xl border border-white/10">
-          <BookMarked className="text-indigo-400" size={24} />
-        </div>
-        내 서재
-      </h1>
+    <div className="max-w-6xl mx-auto p-6 pb-20">
+      <header className="mb-10">
+        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+          <div className="p-2 bg-indigo-500/20 rounded-xl border border-indigo-500/30">
+            <BookMarked className="text-indigo-400" size={24} />
+          </div>
+          내 서재
+        </h1>
+      </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {books?.map((book) => (
-          <div key={book.id} className="glass-panel rounded-2xl p-6 hover:-translate-y-1 transition-all duration-300 group">
-            <div className="flex justify-between items-start mb-5">
-              <div>
-                <h3 className="font-bold text-xl text-white line-clamp-1 tracking-tight">{book.title}</h3>
-                <p className="text-sm text-white/50 mt-1.5">{book.author}</p>
-              </div>
+        {books?.map((book: any, idx: number) => (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: idx * 0.1 }}
+            key={book.id}
+            className="glass-panel rounded-3xl p-6 hover:bg-white/10 transition-all border border-white/10"
+          >
+            <div className="mb-6">
+              <h3 className="font-bold text-lg text-white line-clamp-1">{book.title}</h3>
+              <p className="text-xs text-white/40 mt-1">{book.author}</p>
             </div>
-            
-            <div className="flex gap-2 mb-8">
-              <span className="text-xs px-2.5 py-1 bg-white/5 border border-white/10 text-white/70 rounded-lg">{book.genre}</span>
-              <span className="text-xs px-2.5 py-1 bg-white/5 border border-white/10 text-white/70 rounded-lg">{book.difficulty}</span>
+
+            <div className="flex gap-2 mb-6">
+              <span className="text-[10px] font-bold px-2.5 py-1 bg-indigo-500/10 text-indigo-300 rounded-lg">
+                {book.sub_category} {/* 장르가 아닌 소분류 표시 */}
+              </span>
+              <span className="text-[10px] font-bold px-2.5 py-1 bg-white/5 text-white/40 rounded-lg">LV.{book.difficulty}</span>
             </div>
 
             <button
-              onClick={() => setSelectedBook({ id: book.id, title: book.title })}
-              className="w-full py-3 flex items-center justify-center gap-2 glass-button rounded-xl font-medium group-hover:bg-indigo-500/20 group-hover:border-indigo-500/30 group-hover:text-indigo-300 transition-all"
+              onClick={() => setSelectedBook(book)}
+              className="w-full py-3 flex items-center justify-center gap-2 bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-indigo-500/20"
             >
-              <Edit3 size={16} />
-              독후감 쓰기
+              <Edit3 size={14} /> 기록 남기기 및 레벨업
             </button>
-          </div>
+          </motion.div>
         ))}
       </div>
 
       {selectedBook && (
-        <ReviewWrite 
-          bookId={selectedBook.id} 
-          bookTitle={selectedBook.title} 
-          onClose={() => setSelectedBook(null)} 
+        <ReviewWrite
+          readBookId={selectedBook.id}
+          bookTitle={selectedBook.title}
+          category={selectedBook.sub_category} // 💡 소분류 전달
+          onClose={() => setSelectedBook(null)}
         />
       )}
     </div>
